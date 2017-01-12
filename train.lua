@@ -19,19 +19,19 @@ local cjson = require 'cjson'
 -- Initialize training information
 local opt = {}
 opt.checkpoint_path = 'logs/model.t7'
-opt.max_iters = 40000
-opt.save_checkpoint_every = 10000
+opt.max_iters = 1
+opt.save_checkpoint_every = 1
 
-opt.weight_decay = 0.0005
+opt.weight_decay = 0
 opt.optim = 'adam'
 opt.cnn_optim = 'adam'
-opt.learning_rate = 1e-3
-opt.cnn_learning_rate = 1e-3
+opt.learning_rate = 1e-9
+opt.cnn_learning_rate = 1e-9
 opt.val_images_use = 4000
 opt.optim_alpha = 0.9
 opt.optim_beta = 0.999
 opt.optim_epsilon = 1e-8
-opt.fine_tune_cnn = true
+opt.fine_tune_cnn = false
 
 local iter = 1
 local optim_state = {}
@@ -43,7 +43,7 @@ if opt.fine_tune_cnn then
 end
 
 local faknet = nn.Sequential():type(classifier.dtype)
-faknet:add(classifier.model.rpn)
+--knet:add(classifier.model.rpn)
 faknet:add(classifier.model.recog)
 local params, grad_params = faknet:getParameters()
 
