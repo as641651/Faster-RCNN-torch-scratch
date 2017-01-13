@@ -1,4 +1,5 @@
 require 'modules.BoxSampler'
+local box_utils = require 'densecap.box_utils'
 
 local helper, parent = torch.class('nn.BoxSamplerHelper', 'nn.Module')
 
@@ -21,15 +22,6 @@ function helper:__init(options)
   self.neg_input_idx = nil
 end
 
-function helper:setNmsThresh(nms_thresh)
-  -- Just forward to the underlying sampler
-  self.box_sampler:setNmsThresh(nms_thresh)
-end
-
-function helper:setNumProposals(num_proposals)
-  -- Just forward to the underlying sampler
-  self.box_sampler:setNumProposals(num_proposals)
-end
 
 function helper:setBounds(bounds)
   -- Just forward to the underlying sampler
@@ -79,17 +71,28 @@ function helper:updateOutput(input)
   local input_data = input[1]
   local target_data = input[2]
   local input_boxes = input_data[1]
-  local input_scores = input_data[4]
   local target_boxes = target_data[1]
   local N = input_boxes:size(1)
   assert(N == 1, 'Only minibatches of 1 are supported')
 
+  local fg_scores = input_data[4]:select(3,2):contiguous():view(-1)
+  local topK = 8000
+  if fg_scores:size(1) < 8000 then topK = fg_scores:size(1) end
+  local Y, preNMSidx = torch.topk(fg_scores,topK,1,true,true)
+  local preNMS_boxes = input_boxes[1]:index(1,preNMSidx)
+  local preNMS_boxes_x1y1x2y2 = box_utils.xcycwh_to_x1y1x2y2(preNMS_boxes:contiguous():float())  
+  local boxes_scores = torch.FloatTensor(preNMSidx:size(1),5)
+  boxes_scores[{{},{1,4}}]:copy(preNMS_boxes_x1y1x2y2)
+  boxes_scores[{{},5}]:copy(Y:float())
+  local nms_idx = box_utils.nms(boxes_scores,0.7,2000)
+  local sampler_input_boxes = preNMS_boxes:index(1,nms_idx):contiguous()
+  sampler_input_boxes = sampler_input_boxes:view(1,sampler_input_boxes:size(1),4)
   -- Run the sampler to get the indices of the positive and negative boxes
-  local idxs = self.box_sampler:forward{input_boxes, input_scores, target_boxes}
-  self.pos_input_idx = idxs[1]
+  local idxs = self.box_sampler:forward{sampler_input_boxes, target_boxes}
+ 
+  self.pos_input_idx = preNMSidx:index(1,nms_idx:index(1,idxs[1]))
   self.pos_target_idx = idxs[2]
-  self.neg_input_idx = idxs[3]
-
+  self.neg_input_idx = preNMSidx:index(1,nms_idx:index(1,idxs[3]))
   -- Resize the output. We need to allocate additional tensors for the
   -- input data and target data, then resize them to the right size.
   self.num_pos = self.pos_input_idx:size(1)
@@ -189,16 +192,4 @@ function helper:updateGradInput(input, gradOutput)
   end
 
   return self.gradInput
-end
-
-function helper:clearState()
-  self.output[1] = {}
-  self.output[2] = {}
-  self.output[3] = {}
-  self.gradInput = {}
-
-  self.num_pos, self.num_neg = nil, nil
-  self.pos_input_idx = nil
-  self.pos_target_idx = nil
-  self.neg_input_idx = nil
 end

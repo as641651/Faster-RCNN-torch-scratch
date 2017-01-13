@@ -304,7 +304,7 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
    if fine_tune_cnn then
      local grad_cnn_output_1 = model.cnn_2:backward(cnn_output_1,grad_cnn_output)
    end
---   local grad_input = model.cnn_1:backward(input,grad_cnn_output_1)
+   --local grad_input = model.cnn_1:backward(input,grad_cnn_output_1)
 
    local total = 0
    for k,v in pairs(losses) do
