@@ -364,9 +364,10 @@ function deploy.forward_test(input)
 
   -- Convert objectness positive / negative scores to probabilities
   local rpn_scores_exp = torch.exp(rpn_scores)
-  local pos_exp = rpn_scores_exp[{1, {}, 1}]
-  local neg_exp = rpn_scores_exp[{1, {}, 2}]
+  local pos_exp = rpn_scores_exp[{1, {}, 2}]
+  local neg_exp = rpn_scores_exp[{1, {}, 1}]
   local scores = (pos_exp + neg_exp):pow(-1):cmul(pos_exp)
+--  local scores = rpn_scores:select(3,2):contiguous():view(-1)
   
   local verbose = true
   if verbose then

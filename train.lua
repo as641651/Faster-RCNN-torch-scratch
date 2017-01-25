@@ -19,19 +19,21 @@ local cjson = require 'cjson'
 -- Initialize training information
 local opt = {}
 opt.checkpoint_path = 'logs/model.t7'
-opt.max_iters = 300
-opt.save_checkpoint_every = 200
-
-opt.weight_decay = 0
-opt.optim = 'adam'
-opt.cnn_optim = 'adam'
-opt.learning_rate = 1e-5
-opt.cnn_learning_rate = 1e-6
-opt.val_images_use = 200
+opt.max_iters = 40000
+opt.save_checkpoint_every = 5000
+opt.gamma = 0.1
+opt.step = 50000
+opt.weight_decay = 0.0005
+opt.optim = 'sgdm'
+opt.cnn_optim = 'sgdm'
+opt.learning_rate = 1e-4
+opt.cnn_learning_rate = 1e-4
+opt.val_images_use = -1
 opt.optim_alpha = 0.9
 opt.optim_beta = 0.999
 opt.optim_epsilon = 1e-8
 opt.fine_tune_cnn = true
+print(opt)
 
 local iter = 1
 local optim_state = {}
@@ -102,7 +104,11 @@ while true do
   -- Compute loss and gradient
   local losses = lossFun()
 
-  -- Parameter update
+  if iter%opt.step == 0 then 
+       opt.learning_rate = opt.learning_rate*opt.gamma
+       opt.cnn_learning_rate = opt.cnn_learning_rate*opt.gamma
+  end
+-- Parameter update
   -- perform a parameter update
   if opt.optim == 'rmsprop' then
     rmsprop(params, grad_params, opt.learning_rate, opt.optim_alpha, opt.optim_epsilon, optim_state)
@@ -124,7 +130,7 @@ while true do
     if opt.cnn_optim == 'sgd' then
       sgd(cnn_params, cnn_grad_params, opt.cnn_learning_rate)
     elseif opt.cnn_optim == 'sgdm' then
-      sgdm(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.cnn_optim_alpha, cnn_optim_state)
+      sgdm(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.optim_alpha, cnn_optim_state)
     elseif opt.cnn_optim == 'sgdmom' then
       sgdmom(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.cnn_optim_alpha, cnn_optim_state)
     elseif opt.cnn_optim == 'adam' then
@@ -136,10 +142,6 @@ while true do
 
   -- print loss and timing/benchmarks
   print(string.format('iter %d: %s', iter, utils.build_loss_string(losses)))
-  if iter == 40000 then
-     opt.learning_rate = 1e-4
-     opt.cnn_learning_rate = 1e-4
-  end
 
   if (iter > 0 and iter % opt.save_checkpoint_every == 0) or (iter+1 == opt.max_iters) then
 

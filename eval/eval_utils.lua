@@ -1,4 +1,3 @@
-
 local cjson = require 'cjson'
 local utils = require 'densecap.utils'
 local box_utils = require 'densecap.box_utils'
@@ -82,10 +81,10 @@ function eval_utils.eval_split(kwargs)
         
       end
      
---      evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
-  --        cls_gt_boxes, model.opt.idx_to_cls[cls]) 
-      if scores[cls]:numel() > 0 then evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
-          cls_gt_boxes, model.opt.idx_to_cls[cls]) end
+      evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
+          cls_gt_boxes, cls) 
+  --    if scores[cls]:numel() > 0 then evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
+  --        cls_gt_boxes, model.opt.idx_to_cls[cls]) end
     end
     
     -- Print a message to the console
@@ -118,7 +117,11 @@ function eval_utils.eval_split(kwargs)
       table.insert(ap_results.map, ap_results[cls]['ov0.5'])
       print(cls,ap_results[cls]['ov0.5'])
       table.insert(rc_results.mRecall, rc_results[cls]['ov0.5'])
-      print(cls,rc_results[cls]['ov0.5'])
+--      print(cls,rc_results[cls]['ov0.5'])
+    else
+      table.insert(ap_results.map, 0)
+      print("no proposal")
+      table.insert(rc_results.mRecall, 0)
     end
   end
   ap_results.map = utils.average_values(ap_results.map)
@@ -196,16 +199,24 @@ end
 -- these can be both on CPU or on GPU (they will be shipped to CPU if not already so)
 -- predict_text is length B list of strings, target_text is length M list of strings.
 function DenseCaptioningEvaluator:addResult(scores, boxes, target_boxes, class)
-  assert(scores:size(1) == boxes:size(1))
-  assert(boxes:nDimension() == 2)
-
-  -- convert both boxes to x1y1x2y2 coordinate systems
-  boxes = box_utils.xcycwh_to_x1y1x2y2(boxes)
   if target_boxes == nil then
     target_boxes = boxes.new()
   else
     target_boxes = box_utils.xcycwh_to_x1y1x2y2(target_boxes)
   end
+  local nt = 0
+  if scores:numel() == 0 then 
+    if target_boxes:numel() ~= 0 then
+      nt = target_boxes:size(1) -- number of gt boxes
+    end
+    self.npos = self.npos + nt
+    return 
+  end
+  assert(scores:size(1) == boxes:size(1))
+  assert(boxes:nDimension() == 2)
+
+  -- convert both boxes to x1y1x2y2 coordinate systems
+  boxes = box_utils.xcycwh_to_x1y1x2y2(boxes)
 
   -- make sure we're on CPU
   boxes = boxes:float()
@@ -224,7 +235,6 @@ function DenseCaptioningEvaluator:addResult(scores, boxes, target_boxes, class)
 --  print("Y ", Y)
   
   local nd = scores:size(1) -- number of detections
-  local nt = 0
   if target_boxes:numel() ~= 0 then
     nt = target_boxes:size(1) -- number of gt boxes
   end
@@ -261,12 +271,15 @@ function DenseCaptioningEvaluator:addResult(scores, boxes, target_boxes, class)
       ok = 0
     end
 
-    -- record the best box, the overlap, and the fact that we need to score the language match
+     -- record the best box, the overlap, and the fact that we need to score the language match
     local record = {}
     record.ok = ok -- whether this prediction can be counted toward a true positive
     record.ov = ovmax
     if jmax ~= -1 then
       record.candidate = class
+    end
+    if class ~="RPN" then
+       print("record : ", record)
     end
     -- Replace nil with empty table to prevent crash in meteor bridge
     --if record.references == nil then record.references = {} end

@@ -31,15 +31,16 @@ function eval_utils.eval_split(kwargs)
   split = split_to_int[split]
   print('using split ', split)
   
-  model:evaluate()
+  --model:evaluate()
   loader:resetIterator(split)
   local evaluator = {}
   for cls = 1, model.opt.num_classes do -- 1 is not background, is the output of RPN
     evaluator[cls] = DenseCaptioningEvaluator{id=id}
+  --  print(evaluator[cls])
   end
 
   local counter = 0
-  local all_losses = {}
+  --local all_losses = {}
   while true do
     counter = counter + 1
     
@@ -55,14 +56,14 @@ function eval_utils.eval_split(kwargs)
     info = info[1] -- Since we are only using a single image
 
     -- Call forward_backward to compute losses
-    model.timing = false
-    model.dump_vars = false
-    model.cnn_backward = false
-    local losses = model:forward_backward(data)
-    table.insert(all_losses, losses)
+    --model.timing = false
+    --model.dump_vars = false
+    --model.cnn_backward = false
+    --local losses = model:forward_backward(data)
+    --table.insert(all_losses, losses)
 
     -- Call forward_test to make predictions, and pass them to evaluator
-    local boxes, scores = model:forward_test(data.image)
+    local boxes, scores = model.forward_test(data.image)
     -- 1 is the RPN output
     evaluator[1]:addResult(scores[1], boxes[1], 
           gt_boxes[1], 'RPN')
@@ -71,10 +72,20 @@ function eval_utils.eval_split(kwargs)
       local cls_gt_boxes
       if sel_inds:numel() ~= 0 then
         cls_gt_boxes = gt_boxes[1]:index(1, sel_inds)
---        boxes[cls][{{1,sel_inds:numel()},{}}]:copy(cls_gt_boxes)
+        print("clsdd,gt ", cls, gt_boxes[1])
+        --local Y,IX = torch.sort(scores[2],1,true) -- true makes order descending
+        --print(scores[2])
+        --print("max" , scores[2][IX[1]])
+        --boxes[cls][{{1,sel_inds:numel()},{}}]:copy(cls_gt_boxes)
+        --print(boxes[2])
+        --os.exit()
+        
       end
-      evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
-          cls_gt_boxes, model.opt.idx_to_cls[cls])
+     
+--      evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
+  --        cls_gt_boxes, model.opt.idx_to_cls[cls]) 
+      if scores[cls]:numel() > 0 then evaluator[cls]:addResult(scores[cls], boxes[cls], -- table index start from 1
+          cls_gt_boxes, model.opt.idx_to_cls[cls]) end
     end
     
     -- Print a message to the console
@@ -89,28 +100,35 @@ function eval_utils.eval_split(kwargs)
     if info.split_bounds[1] == info.split_bounds[2] then break end
   end
 
-  local loss_results = utils.dict_average(all_losses)
-  print('Loss stats:')
-  print(loss_results)
-  print('Average loss: ', loss_results.total_loss)
+--  local loss_results = utils.dict_average(all_losses)
+--  print('Loss stats:')
+--  print(loss_results)
   
   local ap_results = {}
   local pr_curves = {}
+  local rc_results = {}
   for cls = 1, model.opt.num_classes do
-    ap_results[cls], pr_curves[cls] = unpack(evaluator[cls]:evaluate())
+    ap_results[cls], pr_curves[cls], rc_results[cls] = unpack(evaluator[cls]:evaluate())
   end
   ap_results.rpn_ap = ap_results[1]['ov0.5'] -- RPN ap
   ap_results.map = {}
+  rc_results.mRecall = {}
   for cls = 2, model.opt.num_classes do
-    table.insert(ap_results.map, ap_results[cls]['ov0.5'])
+    if ap_results[cls] ~= nil then
+      table.insert(ap_results.map, ap_results[cls]['ov0.5'])
+      print(cls,ap_results[cls]['ov0.5'])
+      table.insert(rc_results.mRecall, rc_results[cls]['ov0.5'])
+      print(cls,rc_results[cls]['ov0.5'])
+    end
   end
   ap_results.map = utils.average_values(ap_results.map)
+  rc_results.mRecall = utils.average_values(rc_results.mRecall)
 
   print(string.format('rpn AP: %f', 100 * ap_results.rpn_ap))
   print(string.format('mAP: %f', 100 * ap_results.map))
+  print(string.format('Recall: %f', 100 * rc_results.mRecall))
   
   local out = {
-    loss_results=loss_results,
     ap_results=ap_results,
     pr_curves = pr_curves,
   }
@@ -203,6 +221,7 @@ function DenseCaptioningEvaluator:addResult(scores, boxes, target_boxes, class)
 
   -- 1. Sort detections by decreasing confidence
   local Y,IX = torch.sort(scores,1,true) -- true makes order descending
+--  print("Y ", Y)
   
   local nd = scores:size(1) -- number of detections
   local nt = 0
@@ -263,8 +282,10 @@ end
 
 function DenseCaptioningEvaluator:evaluate(verbose)
   if verbose == nil then verbose = true end
-  local min_overlaps = {0.3, 0.4, 0.5, 0.6, 0.7}
+  --local min_overlaps = {0.3, 0.4, 0.5, 0.6, 0.7}
+  local min_overlaps = {0.5}
 
+  if next(self.all_scores) == nil then return {nil,nil,nil} end
   -- concatenate everything across all images
   local scores = torch.cat(self.all_scores, 1) -- concat all scores
   -- call python to evaluate all records and get their BLEU/METEOR scores
@@ -274,6 +295,7 @@ function DenseCaptioningEvaluator:evaluate(verbose)
   collectgarbage()
 
   -- prints/debugging
+--  print("records ", #self.records)
   if verbose then
     for k=1,#self.records do
       local record = self.records[k]
@@ -288,6 +310,7 @@ function DenseCaptioningEvaluator:evaluate(verbose)
   local y,ix = torch.sort(scores,1,true) -- true makes order descending
 
   local ap_results = {}
+  local recall_results = {}
   local pr_curves = {}
   for foo, min_overlap in pairs(min_overlaps) do
     -- go down the list and build tp,fp arrays
@@ -315,7 +338,8 @@ function DenseCaptioningEvaluator:evaluate(verbose)
 
     fp = torch.cumsum(fp,1)
     tp = torch.cumsum(tp,1)
-    local rec = torch.div(tp, self.npos)
+    local rec = nil
+    if self.npos ~= 0 then rec = torch.div(tp, self.npos) else rec = torch.div(tp, 1) end
     local prec = torch.cdiv(tp, fp + tp)
 
     -- compute max-interpolated average precision
@@ -334,13 +358,14 @@ function DenseCaptioningEvaluator:evaluate(verbose)
 
     -- store it
     ap_results['ov' .. min_overlap] = ap
+    recall_results['ov' .. min_overlap] = rec[rec:size()]
   end
 
   --local map = utils.average_values(ap_results)
   --local detmap = utils.average_values(det_results)
 
   -- lets get out of here
-  local results = {ap_results, pr_curves}
+  local results = {ap_results, pr_curves, recall_results}
   return results
 end
 
