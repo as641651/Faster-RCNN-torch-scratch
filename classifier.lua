@@ -11,6 +11,15 @@ require 'image'
 require 'lfs'
 require 'nn'
 local cjson = require 'cjson'
+require 'nn'
+require 'nngraph'
+require 'modules.MakeAnchors'
+require 'modules.ROIPooling'
+require 'modules.ReshapeBoxFeatures'
+require 'modules.ApplyBoxTransform'
+require 'modules.BoxSamplerHelper'
+require 'modules.RegularizeLayer'
+require 'cudnn'
 
 require 'modules.DataLoader_new'
 require 'modules.ApplyBoxesTransform'
@@ -20,12 +29,27 @@ require 'modules.InvertBoxTransform'
 
 local utils = require 'densecap.utils'
 local box_utils = require 'densecap.box_utils'
-local model = require 'faster_rcnn_model_c'
 local eval_utils = require 'eval.eval_utils'
 
 -------------------------------------------------------------------------------
 -- Initializations
 -------------------------------------------------------------------------------  
+local checkpoint_info = {}
+local ch_start = 'logs/frcnn.t7'
+local model = nil
+if ch_start == "" then 
+  model = require 'faster_rcnn_model'
+else
+  load_c = torch.load(ch_start)
+  model = load_c.model
+  checkpoint_info.optim_state = load_c.optim_state
+  checkpoint_info.cnn_optim_state = load_c.cnn_optim_state
+  checkpoint_info.iter = load_c.iter
+  checkpoint_info.path = ch_start
+  print("Loaded checkpoint..")
+  print(checkpoint_info)
+end
+
 local opt = model.opt
 opt.data_h5 = 'data/voc07.h5'
 opt.data_json = 'data/voc07.json'
@@ -42,6 +66,8 @@ opt.train.mid_objectness_weight = 1.0
 opt.train.mid_box_reg_weight = 1.0
 opt.train.classification_weight = 1.0
 opt.train.end_box_reg_weight=1.0
+opt.checkpoint_start = ch_start
+
 
 print(opt)
 opt.train.crits = {}
@@ -462,6 +488,6 @@ classifier.loader = loader
 classifier.dtype = dtype
 classifier.model = model
 classifier.opt = opt
-
+classifier.checkpoint_info = checkpoint_info
 return classifier
 

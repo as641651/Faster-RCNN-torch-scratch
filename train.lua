@@ -19,16 +19,16 @@ local cjson = require 'cjson'
 -- Initialize training information
 local opt = {}
 opt.checkpoint_path = 'logs/model.t7'
-opt.max_iters = 40000
-opt.save_checkpoint_every = 5000
+opt.max_iters = 80000
+opt.save_checkpoint_every = 10000
 opt.gamma = 0.1
-opt.step = 50000
+opt.step = 60000
 opt.weight_decay = 0.0005
 opt.optim = 'sgdm'
 opt.cnn_optim = 'sgdm'
-opt.learning_rate = 1e-4
-opt.cnn_learning_rate = 1e-4
-opt.val_images_use = -1
+opt.learning_rate = 1e-3
+opt.cnn_learning_rate = 1e-3
+opt.val_images_use = 2000
 opt.optim_alpha = 0.9
 opt.optim_beta = 0.999
 opt.optim_epsilon = 1e-8
@@ -39,6 +39,12 @@ local iter = 1
 local optim_state = {}
 local cnn_optim_state = {}
 local results_history = {}
+
+if classifier.checkpoint_info.path ~= nil then
+   optim_state = classifier.checkpoint_info.optim_state
+   cnn_optim_state = classifier.checkpoint_info.cnn_optim_state
+   iter = classifier.checkpoint_info.iter
+end
 
 if opt.fine_tune_cnn then
    cnn_params, cnn_grad_params = classifier.model.cnn_2:getParameters()

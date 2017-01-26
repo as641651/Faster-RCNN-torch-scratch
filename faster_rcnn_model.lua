@@ -201,7 +201,7 @@ model['rpn_bbox_pred'].bias:fill(0)
 model['cls_score'].bias:fill(0)
 model['bbox_pred'].bias:fill(0)
 
-print(model)
+--print(model)
 net.cnn_1 =  vgg16_1(model)
 net.cnn_2 =  vgg16_2(model)
 net.rpn = rpn(model)
