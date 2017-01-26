@@ -73,7 +73,7 @@ function M.parse(arg)
   cmd:option('-gpu', 0, 'which gpu to use. -1 = use CPU')
   cmd:option('-timing', false, 'whether to time parts of the net')
   cmd:option('-clip_final_boxes', 1,
-             'Whether to clip final boxes to image boundar')
+             'Whether to clip final boxes to image boundar') --not incorprated
   cmd:option('-eval',0,
     'only evaluate? 1 = do, 0 = dont.')
 

@@ -73,12 +73,13 @@ end
 local opt = model.opt
 opt.data_h5 = 'data/voc07.h5'
 opt.data_json = 'data/voc07.json'
-opt.gpu = 0
-opt.seed = 123 
+opt.gpu = cmd.gpu
+opt.seed = cmd.seed 
 opt.clip_boxes = true
-opt.nms_thresh = 0.7 
-opt.final_nms_thresh = 0.3
-opt.max_proposals = 300
+opt.nms_thresh = cmd.test_rpn_nms_thresh 
+opt.final_nms_thresh = cmd.test_final_nms_thresh
+opt.max_proposals = cmd.test_num_proposals
+opt.image_size = cmd.image_size
 
 opt.train = {}
 opt.train.remove_outbound_boxes = 1
