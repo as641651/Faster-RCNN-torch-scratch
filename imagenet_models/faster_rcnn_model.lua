@@ -2,14 +2,17 @@ require 'nn'
 require 'nngraph'
 require 'modules.MakeAnchors'
 require 'modules.ROIPooling'
+require 'modules.BilinearRoiPooling'
 require 'modules.ReshapeBoxFeatures'
 require 'modules.ApplyBoxTransform'
 require 'modules.BoxSamplerHelper'
 require 'modules.RegularizeLayer'
+local train_opts = require 'train_opts'
+local cmd = train_opts.parse(arg)
 
 opt = {}
-opt.backend = 'cudnn'
-opt.box_reg_decay = 0
+opt.backend = cmd.backend
+opt.box_reg_decay = cmd.box_reg_decay
 opt.field_centers = {8.5,8.5,16,16} --fcnn
 opt.sampler_nms_thresh = 1
 opt.sampler_num_proposals = 2000
@@ -33,14 +36,6 @@ function vgg16_1(model)
   net:add(model["relu2_2"])
   net:add(model["pool2"])
 
-  net:add(model["conv3_1"])
-  net:add(model["relu3_1"])
-  net:add(model["conv3_2"])
-  net:add(model["relu3_2"])
-  net:add(model["conv3_3"])
-  net:add(model["relu3_3"])
-  net:add(model["pool3"])
-
 
   if opt.backend == 'cudnn' then
     require 'cudnn'
@@ -53,6 +48,14 @@ end
 
 function vgg16_2(model)
   local net = nn.Sequential()
+  
+  net:add(model["conv3_1"])
+  net:add(model["relu3_1"])
+  net:add(model["conv3_2"])
+  net:add(model["relu3_2"])
+  net:add(model["conv3_3"])
+  net:add(model["relu3_3"])
+  net:add(model["pool3"])
 
   net:add(model["conv4_1"])
   net:add(model["relu4_1"])
@@ -174,7 +177,7 @@ end
    
 
 local net = {}
-local model = torch.load('ll.t7')
+local model = torch.load('imagenet_models/vgg16.t7')
 model['relu1_1'].inplace = true
 model['relu1_2'].inplace = true
 model['relu2_1'].inplace = true
@@ -190,20 +193,33 @@ model['relu5_2'].inplace = true
 model['relu5_3'].inplace = true
 model['relu6'].inplace = true
 model['relu7'].inplace = true
+model['rpn_conv/3x3'].weight:normal(0,0.0001)
+model['rpn_cls_score'].weight:normal(0,0.0001)
+model['rpn_bbox_pred'].weight:normal(0,0.0001)
+model['cls_score'].weight:normal(0,0.0001)
+model['bbox_pred'].weight:normal(0,1e-6)
+model['rpn_conv/3x3'].bias:fill(0)
+model['rpn_cls_score'].bias:fill(0)
+model['rpn_bbox_pred'].bias:fill(0)
+model['cls_score'].bias:fill(0)
+model['bbox_pred'].bias:fill(0)
 
+--print(model)
 net.cnn_1 =  vgg16_1(model)
 net.cnn_2 =  vgg16_2(model)
 net.rpn = rpn(model)
-print(net.cnn_1)
-print(net.cnn_2)
-print(net.rpn)
 net.sampler = nn.BoxSamplerHelper{batch_size = opt.sampler_batch_size,
                                   nms_thresh = opt.sampler_nms_thresh,
                                   num_proposals = opt.sampler_num_proposals}
-net.pooling = nn.ROIPooling(opt.output_height, opt.output_width)
+if cmd.bilinear == 0 then
+   print("Using ROI Pooling")
+   net.pooling = nn.ROIPooling(opt.output_height, opt.output_width)
+else
+   print("Using Bilinear ROI Pooling")
+   net.pooling = nn.BilinearRoiPooling(opt.output_height, opt.output_width)
+end
 net.recog = recog(model)
 net.opt = opt
-
 
 return net
 

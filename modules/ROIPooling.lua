@@ -108,3 +108,8 @@ function layer:type(type)
   self._type = type
   return self
 end
+
+function layer:setImageSize(image_height, image_width)
+  --dummy
+  return self
+end

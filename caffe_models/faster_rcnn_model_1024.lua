@@ -2,37 +2,32 @@ require 'nn'
 require 'nngraph'
 require 'modules.MakeAnchors'
 require 'modules.ROIPooling'
+require 'modules.BilinearRoiPooling'
 require 'modules.ReshapeBoxFeatures'
 require 'modules.ApplyBoxTransform'
 require 'modules.BoxSamplerHelper'
 require 'modules.RegularizeLayer'
+local train_opts = require 'train_opts'
+local cmd = train_opts.parse(arg)
 
 opt = {}
-opt.backend = 'cudnn'
-opt.box_reg_decay = 5e-5
-opt.field_centers = {7.5,7.5,16,16} --fcnn
-opt.sampler_nms_thresh = 1
+opt.backend = cmd.backend
+opt.box_reg_decay = cmd.box_reg_decay
+opt.field_centers = {8.5,8.5,16,16} --fcnn
+opt.sampler_nms_thresh = 0.7
 opt.sampler_num_proposals = 2000
 opt.sampler_batch_size = 128
-opt.output_height = 7
-opt.output_width = 7
+opt.output_height = 6
+opt.output_width = 6
 
 
-function vgg16_1(model)
+function vgg1024_1(model)
   local net = nn.Sequential()
 
-  net:add(model["conv1_1"])
-  net:add(model["relu1_1"])
-  net:add(model["conv1_2"])
-  net:add(model["relu1_2"])
+  net:add(model["conv1"])
+  net:add(model["relu1"])
+  net:add(model["norm1"])
   net:add(model["pool1"])
-
-  net:add(model["conv2_1"])
-  net:add(model["relu2_1"])
-  net:add(model["conv2_2"])
-  net:add(model["relu2_2"])
-  net:add(model["pool2"])
-
 
   if opt.backend == 'cudnn' then
     require 'cudnn'
@@ -43,31 +38,20 @@ function vgg16_1(model)
 end
 
 
-function vgg16_2(model)
+function vgg1024_2(model)
   local net = nn.Sequential()
   
-  net:add(model["conv3_1"])
-  net:add(model["relu3_1"])
-  net:add(model["conv3_2"])
-  net:add(model["relu3_2"])
-  net:add(model["conv3_3"])
-  net:add(model["relu3_3"])
-  net:add(model["pool3"])
-
-  net:add(model["conv4_1"])
-  net:add(model["relu4_1"])
-  net:add(model["conv4_2"])
-  net:add(model["relu4_2"])
-  net:add(model["conv4_3"])
-  net:add(model["relu4_3"])
-  net:add(model["pool4"])
-
-  net:add(model["conv5_1"])
-  net:add(model["relu5_1"])
-  net:add(model["conv5_2"])
-  net:add(model["relu5_2"])
-  net:add(model["conv5_3"])
-  net:add(model["relu5_3"])
+  net:add(model["conv2"])
+  net:add(model["relu2"])
+  net:add(model["norm2"])
+  net:add(model["pool2"])
+  
+  net:add(model["conv3"])
+  net:add(model["relu3"])
+  net:add(model["conv4"])
+  net:add(model["relu4"])
+  net:add(model["conv5"])
+  net:add(model["relu5"])
 
 
   if opt.backend == 'cudnn' then
@@ -132,7 +116,8 @@ function rpn(model)
     require 'cudnn'
     cudnn.convert(rpn, cudnn)
   end
-
+--  print(rpn)
+--  os.exit()
   return rpn
 end
 
@@ -167,48 +152,39 @@ function recog(model)
    local outputs = {class_scores, bbox_pred}
 
    local mod = nn.gModule(inputs,outputs)
-   mod.name = 'recognition_networ'
+   mod.name = 'recognition_network'
    return mod
 end 
    
    
 
 local net = {}
-local model = torch.load('vgg16.t7')
-model['relu1_1'].inplace = true
-model['relu1_2'].inplace = true
-model['relu2_1'].inplace = true
-model['relu2_2'].inplace = true
-model['relu3_1'].inplace = true
-model['relu3_2'].inplace = true
-model['relu3_3'].inplace = true
-model['relu4_1'].inplace = true
-model['relu4_2'].inplace = true
-model['relu4_3'].inplace = true
-model['relu5_1'].inplace = true
-model['relu5_2'].inplace = true
-model['relu5_3'].inplace = true
+local model = torch.load('caffe_models/vgg1024_c.t7')
+model['relu1'].inplace = true
+model['relu2'].inplace = true
+model['relu3'].inplace = true
+model['relu4'].inplace = true
+model['relu5'].inplace = true
 model['relu6'].inplace = true
 model['relu7'].inplace = true
-model['rpn_conv/3x3'].weight:normal(0,0.0001)
-model['rpn_cls_score'].weight:normal(0,0.0001)
-model['rpn_bbox_pred'].weight:normal(0,0.0001)
-model['cls_score'].weight:normal(0,0.0001)
-model['bbox_pred'].weight:normal(0,1e-6)
-model['rpn_conv/3x3'].bias:fill(0)
-model['rpn_cls_score'].bias:fill(0)
-model['rpn_bbox_pred'].bias:fill(0)
-model['cls_score'].bias:fill(0)
-model['bbox_pred'].bias:fill(0)
 
---print(model)
-net.cnn_1 =  vgg16_1(model)
-net.cnn_2 =  vgg16_2(model)
+net.cnn_1 =  vgg1024_1(model)
+net.cnn_2 =  vgg1024_2(model)
 net.rpn = rpn(model)
-net.sampler = nn.BoxSamplerHelper{batch_size = opt.sampler_batch_size,
-                                  nms_thresh = opt.sampler_nms_thresh,
-                                  num_proposals = opt.sampler_num_proposals}
-net.pooling = nn.ROIPooling(opt.output_height, opt.output_width)
+print(net.cnn_1)
+print(net.cnn_2)
+print(net.rpn)
+print("Faster rcnn starting ... ")
+net.sampler = nn.BoxSamplerHelper{batch_size = opt.sampler_batch_size}
+net.proposal = nn.BoxSamplerHelper{batch_size = opt.sampler_batch_size,
+                                   proposal = true}
+if cmd.bilinear == 0 then
+   print("Using ROI Pooling")
+   net.pooling = nn.ROIPooling(opt.output_height, opt.output_width)
+else
+   print("Using Bilinear ROI Pooling")
+   net.pooling = nn.BilinearRoiPooling(opt.output_height, opt.output_width)
+end
 net.recog = recog(model)
 net.opt = opt
 

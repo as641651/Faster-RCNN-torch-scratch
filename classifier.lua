@@ -15,6 +15,7 @@ require 'nn'
 require 'nngraph'
 require 'modules.MakeAnchors'
 require 'modules.ROIPooling'
+require 'modules.BilinearRoiPooling'
 require 'modules.ReshapeBoxFeatures'
 require 'modules.ApplyBoxTransform'
 require 'modules.BoxSamplerHelper'
@@ -31,14 +32,33 @@ local utils = require 'densecap.utils'
 local box_utils = require 'densecap.box_utils'
 local eval_utils = require 'eval.eval_utils'
 
+local train_opts = require 'train_opts'
+local cmd = train_opts.parse(arg)
+
 -------------------------------------------------------------------------------
 -- Initializations
 -------------------------------------------------------------------------------  
 local checkpoint_info = {}
-local ch_start = 'logs/frcnn.t7'
+local ch_start = cmd.checkpoint_start_from
 local model = nil
-if ch_start == "" then 
-  model = require 'faster_rcnn_model'
+if ch_start == "" then
+  if cmd.use_fcnn == 1 then
+      if cmd.vgg1024 == 0 then 
+         print("Loading caffe trained faster rcnn model VGG16..")
+         model = require 'caffe_models.faster_rcnn_model' 
+      else
+         print("Loading caffe trained faster rcnn model VGG1024..")
+         model = require 'caffe_models.faster_rcnn_model_1024'
+      end
+  else
+      if cmd.vgg1024 == 0 then 
+         print("Loading imagenet model VGG16..")
+         model = require 'imagenet_models.faster_rcnn_model' 
+      else
+         print("Loading imagenet model VGG1024..")
+         model = require 'imagenet_models.faster_rcnn_model_1024'
+      end
+  end
 else
   load_c = torch.load(ch_start)
   model = load_c.model
@@ -217,6 +237,7 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
 -------------------------------------------------------------------------------
 -- ---------------- Roi Pooling and FC net
 -------------------------------------------------------------------------------
+   if cmd.bilinear == 1 then model.pooling:setImageSize(input:size(3), input:size(4)) end
    local roi_features = model.pooling:forward{cnn_output[1], roi_boxes}
 --   print("roi_feats : ", roi_features:size())
    local net_out = model.recog:forward(roi_features)
@@ -275,7 +296,16 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
    local grad_pool = model.pooling:backward(
                     {cnn_output[1], roi_boxes},
                     grad_roi_features)
+   --print(grad_pool[2])
    --grad_roi_boxes:add(din[2])
+   local grad_neg_roi_boxes = neg_boxes.new(#neg_boxes):zero()
+   if cmd.bilinear == 1 then
+     grad_pos_roi_boxes = grad_pool[2][{{1,num_pos}}]
+     grad_neg_roi_boxes = grad_pool[2][{{num_pos+1, num_pos+num_neg}}]
+   end
+   --print(grad_pos_roi_boxes)
+   --print(grad_neg_roi_boxes)
+
 
    grad_cnn_output:add(grad_pool[1]:viewAs(cnn_output))
 
@@ -299,7 +329,6 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
    local grad_pos_trans =  opt.train.crits.rpn_box_reg_crit:backward(pos_trans, pos_trans_targets)
    grad_pos_trans:mul(opt.train.mid_box_reg_weight)
 --   grad_pos_trans:zero() --debug
-   local grad_neg_roi_boxes = neg_boxes.new(#neg_boxes):zero()
 
 -------------------------------------------------------------------------------
 -- ----------------------------------------- grad rpn out
@@ -429,7 +458,7 @@ function deploy.forward_test(input)
     print(string.format('After NMS there are %d boxes', rpn_boxes_nms:size(1)))
   end
 
-  -- self.nets.roi_pooling:setImageSize(self.image_height, self.image_width)
+  if cmd.bilinear == 1 then model.pooling:setImageSize(input:size(3), input:size(4)) end
   local roi_features = model.pooling:forward{cnn_output[1], rpn_boxes_nms}
   local net_out = model.recog:forward(roi_features)
  

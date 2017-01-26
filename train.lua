@@ -12,28 +12,34 @@ classifier = require 'classifier'
 local utils = require 'densecap.utils'
 local eval_utils = require 'eval.eval_utils'
 local cjson = require 'cjson'
+local train_opts = require 'train_opts'
+local cmd = train_opts.parse(arg)
+print("Command Line opts")
+print(cmd)
+
 -------------------------------------------------------------------------------
 -- Initializations
 -------------------------------------------------------------------------------
 
 -- Initialize training information
 local opt = {}
-opt.checkpoint_path = 'logs/model.t7'
-opt.max_iters = 80000
-opt.save_checkpoint_every = 10000
-opt.gamma = 0.1
-opt.step = 60000
-opt.weight_decay = 0.0005
-opt.optim = 'sgdm'
-opt.cnn_optim = 'sgdm'
-opt.learning_rate = 1e-3
-opt.cnn_learning_rate = 1e-3
-opt.val_images_use = 2000
-opt.optim_alpha = 0.9
-opt.optim_beta = 0.999
-opt.optim_epsilon = 1e-8
-opt.fine_tune_cnn = true
-print(opt)
+opt.checkpoint_path = cmd.checkpoint_path
+opt.max_iters = cmd.max_iters
+opt.save_checkpoint_every = cmd.save_checkpoint_every
+opt.gamma = cmd.gamma
+opt.step = cmd.step
+opt.weight_decay = cmd.weight_decay
+opt.optim = cmd.optim
+opt.cnn_optim = cmd.optim
+opt.learning_rate = cmd.learning_rate
+opt.cnn_learning_rate = cmd.cnn_learning_rate
+opt.val_images_use = cmd.val_images_use
+opt.optim_alpha = cmd.optim_alpha
+opt.optim_beta = cmd.optim_beta
+opt.optim_epsilon = cmd.optim_epsilon
+opt.fine_tune_cnn = false
+opt.eval = cmd.eval
+if cmd.finetune_cnn > 0 then opt.fine_tune_cnn = true end
 
 local iter = 1
 local optim_state = {}
@@ -116,40 +122,44 @@ while true do
   end
 -- Parameter update
   -- perform a parameter update
-  if opt.optim == 'rmsprop' then
-    rmsprop(params, grad_params, opt.learning_rate, opt.optim_alpha, opt.optim_epsilon, optim_state)
-  elseif opt.optim == 'adagrad' then
-    adagrad(params, grad_params, opt.learning_rate, opt.optim_epsilon, optim_state)
-  elseif opt.optim == 'sgd' then
-    sgd(params, grad_params, opt.learning_rate)
-  elseif opt.optim == 'sgdm' then
-    sgdm(params, grad_params, opt.learning_rate, opt.optim_alpha, optim_state)
-  elseif opt.optim == 'sgdmom' then
-    sgdmom(params, grad_params, opt.learning_rate, opt.optim_alpha, optim_state)
-  elseif opt.optim == 'adam' then
-    adam(params, grad_params, opt.learning_rate, opt.optim_alpha, opt.optim_beta, opt.optim_epsilon, optim_state)
-  else
-    error('bad option opt.optim')
-  end
-
-  if opt.fine_tune_cnn then
-    if opt.cnn_optim == 'sgd' then
-      sgd(cnn_params, cnn_grad_params, opt.cnn_learning_rate)
-    elseif opt.cnn_optim == 'sgdm' then
-      sgdm(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.optim_alpha, cnn_optim_state)
-    elseif opt.cnn_optim == 'sgdmom' then
-      sgdmom(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.cnn_optim_alpha, cnn_optim_state)
-    elseif opt.cnn_optim == 'adam' then
-      adam(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.cnn_optim_alpha, opt.cnn_optim_beta, opt.optim_epsilon, cnn_optim_state)
+  if opt.eval == 0 then 
+    if opt.optim == 'rmsprop' then
+      rmsprop(params, grad_params, opt.learning_rate, opt.optim_alpha, opt.optim_epsilon, optim_state)
+    elseif opt.optim == 'adagrad' then
+      adagrad(params, grad_params, opt.learning_rate, opt.optim_epsilon, optim_state)
+    elseif opt.optim == 'sgd' then
+      sgd(params, grad_params, opt.learning_rate)
+    elseif opt.optim == 'sgdm' then
+      sgdm(params, grad_params, opt.learning_rate, opt.optim_alpha, optim_state)
+    elseif opt.optim == 'sgdmom' then
+      sgdmom(params, grad_params, opt.learning_rate, opt.optim_alpha, optim_state)
+    elseif opt.optim == 'adam' then
+      adam(params, grad_params, opt.learning_rate, opt.optim_alpha, opt.optim_beta, opt.optim_epsilon, optim_state)
     else
-      error('bad option for opt.cnn_optim')
+      error('bad option opt.optim')
     end
+
+    if opt.fine_tune_cnn then
+      if opt.cnn_optim == 'sgd' then
+        sgd(cnn_params, cnn_grad_params, opt.cnn_learning_rate)
+      elseif opt.cnn_optim == 'sgdm' then
+        sgdm(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.optim_alpha, cnn_optim_state)
+      elseif opt.cnn_optim == 'sgdmom' then
+        sgdmom(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.cnn_optim_alpha, cnn_optim_state)
+      elseif opt.cnn_optim == 'adam' then
+        adam(cnn_params, cnn_grad_params, opt.cnn_learning_rate, opt.cnn_optim_alpha, opt.cnn_optim_beta, opt.optim_epsilon, cnn_optim_state)
+      else
+        error('bad option for opt.cnn_optim')
+      end
+    end
+    -- print loss and timing/benchmarks
+    print(string.format('iter %d: %s', iter, utils.build_loss_string(losses)))
+  else
+    print("Running evaluation ....")
   end
 
-  -- print loss and timing/benchmarks
-  print(string.format('iter %d: %s', iter, utils.build_loss_string(losses)))
 
-  if (iter > 0 and iter % opt.save_checkpoint_every == 0) or (iter+1 == opt.max_iters) then
+  if (iter > 0 and iter % opt.save_checkpoint_every == 0) or (iter+1 == opt.max_iters) or opt.eval ~= 0 then
 
     -- Evaluate validation performance
     local eval_kwargs = {
@@ -160,6 +170,7 @@ while true do
       dtype=dtype,
     }
     local results = eval_utils.eval_split(eval_kwargs)
+    if opt.eval ~= 0 then break end
     results_history[iter] = results
 
     -- serialize a json file that has all info except the model
