@@ -187,17 +187,17 @@ while true do
     file:close()
     print('wrote ' .. opt.checkpoint_path .. '.json')
 
-    if iter+1 == opt.max_iters  then
+    --if iter+1 == opt.max_iters  then
       -- save the optim state, for better resuming
-      checkpoint.optim_state = optim_state
-      checkpoint.cnn_optim_state = cnn_optim_state
-      -- save the model
-      checkpoint.model = classifier.model
+    checkpoint.optim_state = optim_state
+    checkpoint.cnn_optim_state = cnn_optim_state
+    -- save the model
+    checkpoint.model = classifier.model
 
-      torch.save(opt.checkpoint_path, checkpoint)
-      print('wrote ' .. opt.checkpoint_path)
+    torch.save(opt.checkpoint_path, checkpoint)
+    print('wrote ' .. opt.checkpoint_path)
 
-    end
+    --end
   end
     
   -- stopping criterions

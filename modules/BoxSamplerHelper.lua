@@ -75,11 +75,11 @@ function helper:updateOutput(input)
   local N = input_boxes:size(1)
   assert(N == 1, 'Only minibatches of 1 are supported')
 
-  --local rpn_scores_exp = torch.exp(input_data[4])
-  --local pos_exp = rpn_scores_exp[{1, {}, 2}]
-  --local neg_exp = rpn_scores_exp[{1, {}, 1}]
-  --local fg_scores = (pos_exp + neg_exp):pow(-1):cmul(pos_exp)
-  local fg_scores = input_data[4]:select(3,2):contiguous():view(-1)
+  local rpn_scores_exp = torch.exp(input_data[4])
+  local pos_exp = rpn_scores_exp[{1, {}, 2}]
+  local neg_exp = rpn_scores_exp[{1, {}, 1}]
+  local fg_scores = (pos_exp + neg_exp):pow(-1):cmul(pos_exp)
+  --local fg_scores = input_data[4]:select(3,2):contiguous():view(-1)
   local topK = 8000
   if fg_scores:size(1) < 8000 then topK = fg_scores:size(1) end
   local Y, preNMSidx = torch.topk(fg_scores,topK,1,true,true)
