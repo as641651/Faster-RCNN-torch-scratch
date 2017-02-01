@@ -12,6 +12,7 @@ function BoxSampler:__init(options)
   self.low_thresh = utils.getopt(options, 'low_thresh', 0.3)
   self.high_thresh = utils.getopt(options, 'high_thresh', 0.7)
   self.batch_size = utils.getopt(options, 'batch_size', 256)
+  self.fg_fraction = utils.getopt(options, 'fg_fraction', 0.5)
   
   self.x_min, self.x_max = nil, nil
   self.y_min, self.y_max = nil, nil
@@ -133,7 +134,7 @@ function BoxSampler:updateOutput(input)
   local total_pos = pos_mask_nonzero:size(1)
   local total_neg = neg_mask_nonzero:size(1)
 
-  local num_pos = math.min(self.batch_size / 2, total_pos)
+  local num_pos = math.min(self.batch_size*self.fg_fraction, total_pos)
   local num_neg = self.batch_size - num_pos
 
   -- We always sample positives without replacemet

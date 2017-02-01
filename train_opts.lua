@@ -31,7 +31,7 @@ function M.parse(arg)
     'Strength of pull that boxes experience towards their anchor')
 
   -- Data input settings
-  cmd:option('-image_size', "720",
+  cmd:option('-image_size', "^600",
     '\"720\" means longer side to be 720, \"^600\" means shorter side to be 600.')
 
   -- Optimization

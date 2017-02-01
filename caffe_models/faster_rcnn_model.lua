@@ -14,11 +14,20 @@ opt = {}
 opt.backend = cmd.backend
 opt.box_reg_decay = cmd.box_reg_decay
 opt.field_centers = {8.5,8.5,16,16} --fcnn
-opt.sampler_nms_thresh = 1
-opt.sampler_num_proposals = 2000
-opt.sampler_batch_size = 128
+
+opt.rpn_low_thresh = 0.3
+opt.rpn_high_thresh = 0.7
+opt.rpn_batch_size = 256
+opt.rpn_fg_fraction = 0.5
+opt.proposal_low_thresh = 0.5
+opt.proposal_high_thresh = 0.5
+opt.proposal_batch_size = 128
+opt.proposal_fg_fraction = 0.25
+
 opt.output_height = 7
 opt.output_width = 7
+print("RPN OPTS ")
+print(opt)
 
 
 function vgg16_1(model)
@@ -200,9 +209,16 @@ net.rpn = rpn(model)
 print(net.cnn_1)
 print(net.cnn_2)
 print(net.rpn)
-net.sampler = nn.BoxSamplerHelper{batch_size = opt.sampler_batch_size,
-                                  nms_thresh = opt.sampler_nms_thresh,
-                                  num_proposals = opt.sampler_num_proposals}
+net.sampler = nn.BoxSamplerHelper{batch_size = opt.rpn_batch_size,
+                                  low_thresh = opt.rpn_low_thresh,
+                                  high_thresh = opt.rpn_high_thresh,
+                                  fg_fraction = opt.rpn_fg_fraction}
+
+net.proposal = nn.BoxSamplerHelper{batch_size = opt.proposal_batch_size,
+                                  low_thresh = opt.proposal_low_thresh,
+                                  high_thresh = opt.proposal_high_thresh,
+                                  fg_fraction = opt.proposal_fg_fraction,
+                                  proposal = true}
 if cmd.bilinear == 0 then
    print("Using ROI Pooling")
    net.pooling = nn.ROIPooling(opt.output_height, opt.output_width)
