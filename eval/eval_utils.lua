@@ -42,6 +42,7 @@ function eval_utils.eval_split(kwargs)
   --local all_losses = {}
   while true do
     counter = counter + 1
+    collectgarbage()
     
     -- Grab a batch of data and convert it to the right dtype
     local data = {}

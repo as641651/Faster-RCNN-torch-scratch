@@ -135,6 +135,10 @@ opt.train.crits.rpn_box_reg_crit:type(dtype)
 local train = {}
 function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
 
+   model.rpn:clearState()
+   model.cnn_1:clearState()
+   model.cnn_2:clearState()
+
    local losses = {}
 --   losses.obj_loss_pos = 0
 --   losses.obj_loss_neg = 0
@@ -421,6 +425,7 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
      end
    end
    losses.total_loss = total
+   collectgarbage()
 
    return losses
 
@@ -433,6 +438,11 @@ deploy.opt = opt
 -- forward_test
 -------------------------------------------------------------------------------
 function deploy.forward_test(input)  
+
+   model.rpn:clearState()
+   model.cnn_1:clearState()
+   model.cnn_2:clearState()
+
    local cnn_output_1 = model.cnn_1:forward(input)
    local cnn_output = model.cnn_2:forward(cnn_output_1)
    local rpn_out = model.rpn:forward(cnn_output)
@@ -560,6 +570,7 @@ function deploy.forward_test(input)
   end
 
   print(final_boxes_output)
+  collectgarbage()
   return final_boxes_output, class_scores_output
 end
 
