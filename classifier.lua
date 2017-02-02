@@ -394,11 +394,11 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
 
    local grad_pos_data, grad_neg_data = {}, {}
    grad_pos_data[1] = grad_pos_roi_boxes
-   grad_pos_data[3] = pos_data[3].new(#pos_data[3]):zero()
-   grad_pos_data[4] = pos_data[4].new(#pos_data[4]):zero()
+--   grad_pos_data[3] = pos_data[3].new(#pos_data[3]):zero()
+--   grad_pos_data[4] = pos_data[4].new(#pos_data[4]):zero()
 --   grad_pos_data[4] = grad_pos_scores
    grad_neg_data[1] = grad_neg_roi_boxes
-   grad_neg_data[4] = neg_data[4].new(#neg_data[4]):zero()
+--   grad_neg_data[4] = neg_data[4].new(#neg_data[4]):zero()
 
    local grad_proposal_out = model.proposal:backward(                          --debug
                               {rpn_out, {gt_boxes, gt_labels}},
