@@ -138,6 +138,7 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
    model.rpn:clearState()
    model.cnn_1:clearState()
    model.cnn_2:clearState()
+   model.recog:training()
 
    local losses = {}
 --   losses.obj_loss_pos = 0
@@ -443,6 +444,11 @@ function deploy.forward_test(input)
    model.cnn_1:clearState()
    model.cnn_2:clearState()
 
+  -- model.rpn:evaluate()
+  -- model.cnn_1:evaluate()
+  -- model.cnn_2:evaluate()
+   model.recog:evaluate()
+
    local cnn_output_1 = model.cnn_1:forward(input)
    local cnn_output = model.cnn_2:forward(cnn_output_1)
    local rpn_out = model.rpn:forward(cnn_output)
@@ -511,11 +517,11 @@ function deploy.forward_test(input)
   -- where B2 are the number of boxes after boundary clipping and B3
   -- is the number of boxes after NMS
   local rpn_boxes_nms = rpn_boxes:index(2, idx)[1]
-  local rpn_anchors_nms = rpn_anchors:index(2, idx)[1]
-  local rpn_trans_nms = rpn_trans:index(2, idx)[1]
+  --local rpn_anchors_nms = rpn_anchors:index(2, idx)[1]
+  --local rpn_trans_nms = rpn_trans:index(2, idx)[1]
   -- local rpn_scores_nms = rpn_scores:index(2, idx)[1]
   local rpn_scores_nms = scores:index(1, idx)
-  local scores_nms = scores:index(1, idx)
+  --local scores_nms = scores:index(1, idx)
 
   if verbose then
     print(string.format('After NMS there are %d boxes', rpn_boxes_nms:size(1)))
@@ -549,7 +555,7 @@ function deploy.forward_test(input)
          final_scores_float = final_scores_float:index(1,ii) 
          local final_regions_float = final_boxes_float:select(2,cls)
          final_regions_float = final_regions_float:index(1,ii)
-       print(final_regions_float, final_scores_float)
+         --print(final_regions_float, final_scores_float)
        
          local boxes_scores = torch.FloatTensor(final_regions_float:size(1), 5)
          local boxes_x1y1x2y2 = box_utils.xcycwh_to_x1y1x2y2(final_regions_float:contiguous())
@@ -560,6 +566,8 @@ function deploy.forward_test(input)
          table.insert(final_boxes_output, final_regions_float:index(1, idx):typeAs(final_boxes))
          table.insert(class_scores_output, final_scores_float:index(1, idx):typeAs(net_out[1]))
          after_nms_boxes = after_nms_boxes + final_boxes_output[cls]:size(1)      
+         print(final_regions_float:index(1,idx), final_scores_float:index(1,idx))
+         --os.exit()
       else
          table.insert(final_boxes_output, torch.Tensor():typeAs(final_boxes))
          table.insert(class_scores_output, torch.Tensor():typeAs(net_out[1]))

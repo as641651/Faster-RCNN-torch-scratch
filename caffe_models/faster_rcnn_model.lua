@@ -13,7 +13,7 @@ local cmd = train_opts.parse(arg)
 opt = {}
 opt.backend = cmd.backend
 opt.box_reg_decay = cmd.box_reg_decay
-opt.field_centers = {8.5,8.5,16,16} --fcnn
+opt.field_centers = {16,16,16,16} --fcnn
 
 opt.rpn_low_thresh = 0.3
 opt.rpn_high_thresh = 0.7
