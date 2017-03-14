@@ -60,8 +60,11 @@ function DataLoader:__init(opt)
 
   -- extract some attributes from the data
   self.num_regions = self.boxes:size(1)
-  self.vgg_mean = torch.FloatTensor{103.939, 116.779, 123.68} -- BGR order
-  self.vgg_mean = self.vgg_mean:view(1,3,1,1)
+--  self.vgg_mean = torch.FloatTensor{103.939, 116.779, 123.68} -- BGR order
+  self.vgg_mean = torch.FloatTensor{102.98, 115.9465, 122.7717} -- BGR order
+--  self.vgg_mean = torch.FloatTensor{122.7717, 115.9465, 102.98} -- BGR order
+--  self.vgg_mean = self.vgg_mean:view(1,3,1,1)
+  self.vgg_mean = self.vgg_mean:view(3,1,1)
 
   -- set up index ranges for the different splits
   self.train_ix = {}
@@ -91,9 +94,8 @@ end
 
 function DataLoader:_loadImage(path)
    local ok, input = pcall(function()
-      return image.load(path, 3, 'float')
+      return image.load(path, 3,'float')
    end)
-
    -- Sometimes image.load fails because the file extension does not match the
    -- image format. In that case, use image.decompress on a ByteTensor.
    if not ok then
@@ -172,13 +174,34 @@ function DataLoader:getBatch(opt)
   local filename = self.info.idx_to_filename[tostring(ix)] -- json is loaded with string keys
   assert(filename ~= nil, 'lookup for index ' .. ix .. ' failed in the json info table.')
   local  img = self:_loadImage(filename)
-  local ow,oh = img:size(3), img:size(2)
-  img = image.scale(img, self.image_size)
-  local w,h = img:size(3), img:size(2)
-  img = img:index(1, torch.LongTensor{3, 2, 1}):mul(256.0):float()
-  img = img:view(1, img:size(1), img:size(2), img:size(3)) -- batch the image
+  print(filename)
+  print(img:size())
+  img = img:float()
+  img = img:mul(256.0)
+  --print(self.vgg_mean:size())
   img:add(-1, self.vgg_mean:expandAs(img)) -- subtract vgg mean
-
+  local ow,oh = img:size(3), img:size(2)
+  if ow > 1000 or oh > 1000 then self.image_size = "1000" end
+  img = image.scale(img, self.image_size)
+  print(img:size())
+  local w,h = img:size(3), img:size(2)
+  --img = img:index(1, torch.LongTensor{3, 2, 1})
+  img = img:view(1, img:size(1), img:size(2), img:size(3)) -- batch the image
+  print(img:size())
+  print(img[1][1][1][1])
+  print(img[1][2][1][1])
+  print(img[1][3][1][1])
+  print(img[1][1][2][1])
+  print(img[1][2][2][1])
+  print(img[1][3][2][1])
+  print(img[1][1][1][2])
+  print(img[1][2][1][2])
+  print(img[1][3][1][2])
+  os.exit()
+--  for i = 1, img:view(-1):size(1) do
+--     print(string.format("%e",img:view(-1)[i]))
+--  end
+--  os.exit()
   -- fetch the corresponding labels array
   local r0 = self.img_to_first_box[ix]
   local r1 = self.img_to_last_box[ix]

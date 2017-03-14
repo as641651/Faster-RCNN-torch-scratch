@@ -13,7 +13,7 @@ local cmd = train_opts.parse(arg)
 opt = {}
 opt.backend = cmd.backend
 opt.box_reg_decay = cmd.box_reg_decay
-opt.field_centers = {16,16,16,16} --fcnn
+opt.field_centers = {8,8,16,16} --fcnn
 
 opt.rpn_low_thresh = 0.3
 opt.rpn_high_thresh = 0.7
@@ -186,7 +186,8 @@ end
    
 
 local net = {}
-local model = torch.load('caffe_models/vgg16_c.t7')
+--local model = torch.load('caffe_models/vgg16_c.t7')
+local model = torch.load('caffe_models/vgg16_c_2.t7')
 model['relu1_1'].inplace = true
 model['relu1_2'].inplace = true
 model['relu2_1'].inplace = true

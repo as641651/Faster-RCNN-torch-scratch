@@ -39,6 +39,7 @@ opt.optim_beta = cmd.optim_beta
 opt.optim_epsilon = cmd.optim_epsilon
 opt.fine_tune_cnn = false
 opt.eval = cmd.eval
+opt.vis = cmd.vis
 if cmd.finetune_cnn > 0 then opt.fine_tune_cnn = true end
 
 local iter = 1
@@ -115,7 +116,7 @@ while true do
 
   -- Compute loss and gradient
   local losses = lossFun()
-
+--  local losses = 0
   if iter%opt.step == 0 then 
        opt.learning_rate = opt.learning_rate*opt.gamma
        opt.cnn_learning_rate = opt.cnn_learning_rate*opt.gamma
@@ -168,6 +169,7 @@ while true do
       split='val',
       max_images=opt.val_images_use,
       dtype=dtype,
+      vis = opt.vis,
     }
     local results = eval_utils.eval_split(eval_kwargs)
     if opt.eval ~= 0 then break end

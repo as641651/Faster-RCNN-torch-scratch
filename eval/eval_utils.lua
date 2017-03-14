@@ -1,7 +1,7 @@
 local cjson = require 'cjson'
 local utils = require 'densecap.utils'
 local box_utils = require 'densecap.box_utils'
-
+local vis_utils = require 'densecap.vis_utils'
 local eval_utils = {}
 
 
@@ -25,6 +25,7 @@ function eval_utils.eval_split(kwargs)
   local max_images = utils.getopt(kwargs, 'max_images', -1)
   local id = utils.getopt(kwargs, 'id', '')
   local dtype = utils.getopt(kwargs, 'dtype', 'torch.FloatTensor')
+  local vis = utils.getopt(kwargs, 'vis', false)
   assert(split == 'val' or split == 'test', 'split must be "val" or "test"')
   local split_to_int = {val=1, test=2}
   split = split_to_int[split]
@@ -64,6 +65,11 @@ function eval_utils.eval_split(kwargs)
 
     -- Call forward_test to make predictions, and pass them to evaluator
     local boxes, scores = model.forward_test(data.image)
+    local imgdir = "images/"
+    if counter < 20 and vis then
+      vis_utils.visualize(loader:_loadImage(info.filename), boxes,scores,info.width, info.ori_width, imgdir,counter)
+--      vis_utils.visualize(data.image[1], boxes,scores,info.width, info.width, imgdir,counter)
+    end
     -- 1 is the RPN output
     evaluator[1]:addResult(scores[1], boxes[1], 
           gt_boxes[1], 'RPN')

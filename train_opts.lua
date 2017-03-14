@@ -80,6 +80,7 @@ function M.parse(arg)
   cmd:option('-bilinear', 1, 'use. 0 for ROI pooling')
   cmd:option('-use_fcnn', 1, 'use. 0 to initialize imagenet model')
   cmd:option('-vgg1024', 0, 'use. 1 to smaller cnn')
+  cmd:option('-vis', false, 'to visualize detections')
   cmd:text()
   local opt = cmd:parse(arg or {})
   return opt

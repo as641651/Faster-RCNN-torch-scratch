@@ -135,9 +135,15 @@ opt.train.crits.rpn_box_reg_crit:type(dtype)
 local train = {}
 function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
 
+   collectgarbage()
    model.rpn:clearState()
    model.cnn_1:clearState()
    model.cnn_2:clearState()
+   model.recog:clearState()
+
+   model.rpn:training()
+   model.cnn_1:training()
+   model.cnn_2:training()
    model.recog:training()
 
    local losses = {}
@@ -149,7 +155,7 @@ function train.forward_backward(input,gt_boxes,gt_labels,fine_tune_cnn)
 -------------------------------------------------------------------------------
 -- forward_
 -------------------------------------------------------------------------------
---   print("input : ", input:size())
+   print(input:size())
    local cnn_output_1 = model.cnn_1:forward(input)
 --   print(cnn_output_1:size())
    local cnn_output = model.cnn_2:forward(cnn_output_1)
@@ -444,9 +450,9 @@ function deploy.forward_test(input)
    model.cnn_1:clearState()
    model.cnn_2:clearState()
 
-  -- model.rpn:evaluate()
-  -- model.cnn_1:evaluate()
-  -- model.cnn_2:evaluate()
+   model.rpn:evaluate()
+   model.cnn_1:evaluate()
+   model.cnn_2:evaluate()
    model.recog:evaluate()
 
    local cnn_output_1 = model.cnn_1:forward(input)
@@ -537,8 +543,10 @@ function deploy.forward_test(input)
   local final_boxes = boxesTrans:forward({rpn_boxes_nms, net_out[2]})
 
   local final_boxes_float = final_boxes:float()
-  local class_scores_float = net_out[1]:float()
-  class_scores_float = nn.SoftMax():type(class_scores_float:type()):forward(class_scores_float)
+  local sm_scores = nn.SoftMax():type(net_out[1]:type()):forward(net_out[1])
+  local class_scores_float = sm_scores:float()
+  --local class_scores_float = net_out[1]:float()
+  --class_scores_float = nn.SoftMax():type(class_scores_float:type()):forward(class_scores_float)
     
   local rpn_boxes_float = rpn_boxes_nms:float()
   local rpn_scores_float = rpn_scores_nms:float()

@@ -84,8 +84,8 @@ function helper:updateOutput(input)
     local neg_exp = rpn_scores_exp[{1, {}, 1}]
     local fg_scores = (pos_exp + neg_exp):pow(-1):cmul(pos_exp)
 --local fg_scores = input_data[4]:select(3,2):contiguous():view(-1)
-    local topK = 8000
-    if fg_scores:size(1) < 8000 then topK = fg_scores:size(1) end
+    local topK = 6000
+    if fg_scores:size(1) < 6000 then topK = fg_scores:size(1) end
     local Y, preNMSidx = torch.topk(fg_scores,topK,1,true,true)
     local preNMS_boxes = input_boxes[1]:index(1,preNMSidx)
     local preNMS_boxes_x1y1x2y2 = box_utils.xcycwh_to_x1y1x2y2(preNMS_boxes:contiguous():float())  

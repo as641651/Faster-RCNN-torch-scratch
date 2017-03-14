@@ -22,13 +22,13 @@ end
 
 function layer:updateOutput(input)
 --  self.pooler = {}
+  collectgarbage()
   local data = input[1]
   local rois = box_utils.xcycwh_to_x1y1x2y2(input[2]):clone()
   --correct image ids if we are in parallel mode
   --if rois[1][1] ~=1 then
   --  rois[{{},{1}}] = rois[{{},{1}}] - rois[1][1]+1
   --end
-  --print(rois)
   local num_rois = rois:size(1)
   local s = data:size()
   local ss = s:size(1)
@@ -69,6 +69,7 @@ function layer:updateOutput(input)
 end
 
 function layer:updateGradInput(input,gradOutput)
+  collectgarbage()
   local data = input[1]
   local rois = box_utils.xcycwh_to_x1y1x2y2(input[2]):clone()
   --if rois[1][1] ~=1 then
