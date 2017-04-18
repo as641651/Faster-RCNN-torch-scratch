@@ -115,7 +115,10 @@ local loss0
 while true do  
 
   -- Compute loss and gradient
-  local losses = lossFun()
+  local losses = 0
+  if opt.eval == 0 then
+     losses = lossFun()
+  end
 --  local losses = 0
   if iter%opt.step == 0 then 
        opt.learning_rate = opt.learning_rate*opt.gamma

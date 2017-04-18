@@ -4,6 +4,9 @@ require 'modules.MakeAnchors'
 require 'modules.ROIPooling'
 require 'modules.BilinearRoiPooling'
 require 'modules.ReshapeBoxFeatures'
+require 'modules.ReshapeScores'
+require 'modules.ReshapeBox'
+require 'modules.ReshapeAnchors'
 require 'modules.ApplyBoxTransform'
 require 'modules.BoxSamplerHelper'
 require 'modules.RegularizeLayer'
@@ -13,7 +16,7 @@ local cmd = train_opts.parse(arg)
 opt = {}
 opt.backend = cmd.backend
 opt.box_reg_decay = cmd.box_reg_decay
-opt.field_centers = {8,8,16,16} --fcnn
+opt.field_centers = {7.5,7.5,16,16} --fcnn
 
 opt.rpn_low_thresh = 0.3
 opt.rpn_high_thresh = 0.7
@@ -117,9 +120,12 @@ function rpn(model)
   local seq = nn.Sequential()
   seq:add(nn.MakeAnchors(x0, y0, sx, sy, anchors))
   seq:add(nn.ReshapeBoxFeatures(num_anchors))
+  --seq:add(nn.ReshapeAnchors(num_anchors))
+  --seq:add(nn.ReshapeBox(num_anchors))
   local cat1 = nn.ConcatTable()
   cat1:add(seq)
   cat1:add(nn.ReshapeBoxFeatures(num_anchors))
+  --cat1:add(nn.ReshapeBox(num_anchors))
   box_branch:add(cat1)
 
   local cat2 = nn.ConcatTable()
@@ -130,7 +136,8 @@ function rpn(model)
   -- Branch to produce box / not box scores for each anchor
   local rpn_branch = nn.Sequential()
   rpn_branch:add(model["rpn_cls_score"])
-  rpn_branch:add(nn.ReshapeBoxFeatures(num_anchors))
+  --rpn_branch:add(nn.ReshapeBoxFeatures(num_anchors))
+  rpn_branch:add(nn.ReshapeScores(num_anchors))
 
   -- Concat and flatten the branches
   local concat = nn.ConcatTable()
@@ -187,7 +194,8 @@ end
 
 local net = {}
 --local model = torch.load('caffe_models/vgg16_c.t7')
-local model = torch.load('caffe_models/vgg16_c_2.t7')
+--local model = torch.load('caffe_models/vgg16_c_2.t7')
+local model = torch.load('caffe_models/vgg16_sp2.t7')
 model['relu1_1'].inplace = true
 model['relu1_2'].inplace = true
 model['relu2_1'].inplace = true
@@ -203,6 +211,10 @@ model['relu5_2'].inplace = true
 model['relu5_3'].inplace = true
 model['relu6'].inplace = true
 model['relu7'].inplace = true
+model['pool1']:ceil()
+model['pool2']:ceil()
+model['pool3']:ceil()
+model['pool4']:ceil()
 
 net.cnn_1 =  vgg16_1(model)
 net.cnn_2 =  vgg16_2(model)

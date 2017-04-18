@@ -444,7 +444,9 @@ deploy.opt = opt
 -------------------------------------------------------------------------------
 -- forward_test
 -------------------------------------------------------------------------------
-function deploy.forward_test(input)  
+function deploy.forward_test(input,scale_factor)  
+
+   local scale = scale_factor or 1
 
    model.rpn:clearState()
    model.cnn_1:clearState()
@@ -457,37 +459,68 @@ function deploy.forward_test(input)
 
    local cnn_output_1 = model.cnn_1:forward(input)
    local cnn_output = model.cnn_2:forward(cnn_output_1)
+   print(cnn_output:size())
+   --os.exit()
+   --[[
+   for i=1,cnn_output:size(2) do
+     for j=1,cnn_output:size(3) do
+       for k=1,cnn_output:size(4) do
+         print(i-1,j-1,k-1,cnn_output[1][i][j][k])
+       end
+     end
+     if i > 5 then break end
+   end
+   os.exit()--]]
    local rpn_out = model.rpn:forward(cnn_output)
    
    local rpn_boxes, rpn_anchors = rpn_out[1], rpn_out[2]
    local rpn_trans, rpn_scores = rpn_out[3], rpn_out[4]
    local num_boxes = rpn_boxes:size(2)
+   --print(box_utils.xcycwh_to_x1y1x2y2(rpn_boxes[1]))
+   --os.exit()
+   print(rpn_scores:size())
+   --rpn_scores = rpn_scores:permute(1,3,2):contiguous()
+   print(rpn_scores:size())
+   print(rpn_boxes:size())
+  --print(opt.nms_thresh)
+  --print(opt.max_proposals)
+  -- os.exit()
    
-   if opt.clip_boxes then
+--   if opt.clip_boxes then
     local bounds = {
-       x_min=1, y_min=1,
+       x_min=0, y_min=0,
        x_max=input:size(4),
        y_max=input:size(3)
     }
-    rpn_boxes, valid = box_utils.clip_boxes(rpn_boxes, bounds, 'xcycwh')
 
     -- Clamp parallel arrays only to valid boxes (not oob of the image)
-    local function clamp_data(data)
+    local function clamp_data(data,v)
       -- data should be 1 x kHW x D
       -- valid is byte of shape kHW
       assert(data:size(1) == 1, 'must have 1 image per batch')
       assert(data:dim() == 3)
-      local mask = valid:view(1, -1, 1):expandAs(data)
+      local mask = v:view(1, -1, 1):expandAs(data)
       return data[mask]:view(1, -1, data:size(3))
     end
+    
 
-    rpn_boxes = clamp_data(rpn_boxes)
-    rpn_anchors = clamp_data(rpn_anchors)
-    rpn_trans = clamp_data(rpn_trans)
-    rpn_scores = clamp_data(rpn_scores)
+    rpn_boxes, valid = box_utils.clip_boxes(rpn_boxes, bounds, 'xcycwh')
+    
+    rpn_boxes = clamp_data(rpn_boxes,valid)
+    rpn_anchors = clamp_data(rpn_anchors,valid)
+    rpn_trans = clamp_data(rpn_trans,valid)
+    rpn_scores = clamp_data(rpn_scores,valid)
+    
+    valid = box_utils.filter_boxes(rpn_boxes[1],16*scale)
+    rpn_boxes = clamp_data(rpn_boxes,valid)
+    rpn_anchors = clamp_data(rpn_anchors,valid)
+    rpn_trans = clamp_data(rpn_trans,valid)
+    rpn_scores = clamp_data(rpn_scores,valid)
 
     num_boxes = rpn_boxes:size(2)
-   end
+--   end
+   --print(box_utils.xcycwh_to_x1y1x2y2(rpn_boxes[1]))
+   --os.exit()
   
 -- Convert rpn boxes from (xc, yc, w, h) format to (x1, y1, x2, y2)
   local rpn_boxes_x1y1x2y2 = box_utils.xcycwh_to_x1y1x2y2(rpn_boxes)
@@ -497,6 +530,21 @@ function deploy.forward_test(input)
   local pos_exp = rpn_scores_exp[{1, {}, 2}]
   local neg_exp = rpn_scores_exp[{1, {}, 1}]
   local scores = (pos_exp + neg_exp):pow(-1):cmul(pos_exp)
+  --print(rpn_trans)
+  --print(rpn_boxes_x1y1x2y2)
+  --print(scores)
+  --os.exit()
+  --print(scores)
+  --os.exit()
+ --[[ local ts = rpn_scores[{1,{},2}]:contiguous():view(486,38)
+  for i = 1,ts:size(1) do
+    for j = 1,ts:size(2) do
+        print(i-1,j-1,ts[i][j])
+      end
+   end
+  
+ -- for i =1,scores:size(1) do print (i, scores[i]) end
+  os.exit()--]]
 --  local scores = rpn_scores:select(3,2):contiguous():view(-1)
   
   local verbose = true
@@ -506,11 +554,24 @@ function deploy.forward_test(input)
     print(string.format('Using NMS threshold %f', opt.nms_thresh))
   end
 
+   -- print(scores)
+   -- os.exit()
+    print(rpn_boxes_x1y1x2y2:size())
+    local Y, preNMSidx = torch.topk(scores,6000,1,true,true)
+    rpn_boxes_x1y1x2y2 = rpn_boxes_x1y1x2y2:index(2,preNMSidx)
+    rpn_boxes = rpn_boxes:index(2,preNMSidx)
+--    print(rpn_boxes_x1y1x2y2)
+    scores = scores:index(1, preNMSidx)
+--    print(scores)
+--    os.exit()
+    num_boxes = rpn_boxes_x1y1x2y2:size(2)
 
   -- Run NMS and sort by objectness score
   local boxes_scores = scores.new(num_boxes, 5)
   boxes_scores[{{}, {1, 4}}] = rpn_boxes_x1y1x2y2
   boxes_scores[{{}, 5}] = scores
+  --print(boxes_scores)
+  --os.exit()
   local idx
   if opt.max_proposals == -1 then
     idx = box_utils.nms(boxes_scores, opt.nms_thresh)
@@ -533,14 +594,22 @@ function deploy.forward_test(input)
     print(string.format('After NMS there are %d boxes', rpn_boxes_nms:size(1)))
   end
 
+  --print(rpn_scores_nms)
+  --print(box_utils.xcycwh_to_x1y1x2y2(rpn_boxes_nms))
+  --os.exit()
   if cmd.bilinear == 1 then model.pooling:setImageSize(input:size(3), input:size(4)) end
   local roi_features = model.pooling:forward{cnn_output[1], rpn_boxes_nms}
   local net_out = model.recog:forward(roi_features)
  
   net_out[2] = net_out[2]:view(net_out[2]:size(1),opt.num_classes,4)
+  --print(net_out[2])
+  --os.exit()
   local boxesTrans = nn.Sequential()
   boxesTrans:add(nn.ApplyBoxesTransform():type(dtype))
   local final_boxes = boxesTrans:forward({rpn_boxes_nms, net_out[2]})
+  --print(box_utils.xcycwh_to_x1y1x2y2(rpn_boxes_nms))
+  --os.exit()
+  final_boxes, valid = box_utils.clip_boxes(final_boxes, bounds, 'xcycwh')
 
   local final_boxes_float = final_boxes:float()
   local sm_scores = nn.SoftMax():type(net_out[1]:type()):forward(net_out[1])
@@ -562,6 +631,7 @@ function deploy.forward_test(input)
       if ii:numel() > 0 then 
          final_scores_float = final_scores_float:index(1,ii) 
          local final_regions_float = final_boxes_float:select(2,cls)
+         --print(box_utils.xcycwh_to_x1y1x2y2(final_regions_float:contiguous()))
          final_regions_float = final_regions_float:index(1,ii)
          --print(final_regions_float, final_scores_float)
        
@@ -573,14 +643,16 @@ function deploy.forward_test(input)
      
          table.insert(final_boxes_output, final_regions_float:index(1, idx):typeAs(final_boxes))
          table.insert(class_scores_output, final_scores_float:index(1, idx):typeAs(net_out[1]))
-         after_nms_boxes = after_nms_boxes + final_boxes_output[cls]:size(1)      
-         print(final_regions_float:index(1,idx), final_scores_float:index(1,idx))
+         after_nms_boxes = after_nms_boxes + final_boxes_output[cls]:size(1)
+         print(box_utils.xcycwh_to_x1y1x2y2(final_regions_float:index(1,idx)):div(scale),final_scores_float:index(1,idx))
+         --print(final_regions_float:index(1,idx), final_scores_float:index(1,idx))
          --os.exit()
       else
          table.insert(final_boxes_output, torch.Tensor():typeAs(final_boxes))
          table.insert(class_scores_output, torch.Tensor():typeAs(net_out[1]))
       end
   end
+  --os.exit()
   if verbose then
     print(string.format('After FINAL NMS there are %d boxes', after_nms_boxes))
   end

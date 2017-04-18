@@ -289,6 +289,9 @@ function box_utils.xcycwh_to_x1y1x2y2(boxes)
   x1:div(torch.add(w,-1), 2.0):add(xc)
   y0:div(torch.add(h,-1), 2.0):mul(-1):add(yc)
   y1:div(torch.add(h,-1), 2.0):add(yc)
+
+  x1:add(1.0)
+  y1:add(1.0)
   
   if not minibatch then
     ret = ret:view(boxes:size(2), 4)
@@ -502,13 +505,13 @@ function box_utils.clip_boxes(boxes, bounds, format)
   end
 
   -- Now we can actually clip the boxes
-  boxes_clipped[{{}, 1}]:clamp(bounds.x_min, bounds.x_max - 1)
-  boxes_clipped[{{}, 2}]:clamp(bounds.y_min, bounds.y_max - 1)
-  boxes_clipped[{{}, 3}]:clamp(bounds.x_min + 1, bounds.x_max)
-  boxes_clipped[{{}, 4}]:clamp(bounds.y_min + 1, bounds.y_max)
+  boxes_clipped[{{}, 1}]:clamp(bounds.x_min, bounds.x_max):add(-0.5)
+  boxes_clipped[{{}, 2}]:clamp(bounds.y_min, bounds.y_max):add(-0.5)
+  boxes_clipped[{{}, 3}]:clamp(bounds.x_min , bounds.x_max-1):add(-0.5)
+  boxes_clipped[{{}, 4}]:clamp(bounds.y_min , bounds.y_max-1):add(-0.5)
 
-  local validx = torch.gt(boxes_clipped[{{},3}], boxes_clipped[{{},1}]):byte()
-  local validy = torch.gt(boxes_clipped[{{},4}], boxes_clipped[{{},2}]):byte()
+  local validx = torch.ge(boxes_clipped[{{},3}], boxes_clipped[{{},1}]):byte()
+  local validy = torch.ge(boxes_clipped[{{},4}], boxes_clipped[{{},2}]):byte()
   local valid = torch.gt(torch.cmul(validx, validy), 0) -- logical and operator
 
   -- Convert to the same format as the input
@@ -522,6 +525,12 @@ function box_utils.clip_boxes(boxes, bounds, format)
   return boxes_clipped:viewAs(boxes), valid
 end
 
+function box_utils.filter_boxes(boxes,thresh)
+  local validx = boxes[{{},3}]:gt(thresh)
+  local validy = boxes[{{},4}]:gt(thresh)
+  local valid = torch.gt(torch.cmul(validx, validy), 0) -- logical and operator
+  return valid
+end
 
 --[[
 Inputs:

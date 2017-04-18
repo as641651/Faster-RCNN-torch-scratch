@@ -64,7 +64,7 @@ function eval_utils.eval_split(kwargs)
     --table.insert(all_losses, losses)
 
     -- Call forward_test to make predictions, and pass them to evaluator
-    local boxes, scores = model.forward_test(data.image)
+    local boxes, scores = model.forward_test(data.image,info.scale)
     local imgdir = "images/"
     if counter < 20 and vis then
       vis_utils.visualize(loader:_loadImage(info.filename), boxes,scores,info.width, info.ori_width, imgdir,counter)
@@ -366,15 +366,13 @@ function DenseCaptioningEvaluator:evaluate(verbose)
     local ap = 0
     local apn = 0
     pr_curves['ov' .. min_overlap] = {}
-    for t=0,1,0.01 do
+    for t=0,1.1,0.1 do
       local mask = torch.ge(rec, t):double()
       local prec_masked = torch.cmul(prec:double(), mask)
       local p = torch.max(prec_masked)
       table.insert(pr_curves['ov' .. min_overlap], p)
-      ap = ap + p
-      apn = apn + 1
+      ap = ap + p/11.0
     end
-    ap = ap / apn
 
     -- store it
     ap_results['ov' .. min_overlap] = ap

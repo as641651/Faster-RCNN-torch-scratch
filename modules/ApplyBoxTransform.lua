@@ -63,6 +63,8 @@ end
 function layer:updateOutput(input)
   local boxes, trans = input[1], input[2]
 
+  --print(boxes:size())
+  --os.exit()
   assert(boxes:size(boxes:dim()) == 4, 'Last dim of boxes must be 4')
   assert(trans:size(trans:dim()) == 4, 'Last dim of trans must be 4')
   local boxes_view = boxes:contiguous():view(-1, 4)

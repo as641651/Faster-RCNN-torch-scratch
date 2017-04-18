@@ -62,7 +62,17 @@ function layer:updateOutput(input)
   yc:copy(y_centers:view(1, 1, H, 1):expand(N, k, H, W))
   w:copy(self.anchors[1]:view(1, k, 1, 1):expand(N, k, H, W))
   h:copy(self.anchors[2]:view(1, k, 1, 1):expand(N, k, H, W))
-
+ -- local tmp = torch.zeros(9,4):type(xc:type())
+ -- tmp[{{},1}] = xc[{1,{},1,2}]
+ -- tmp[{{},2}] = yc[{1,{},1,2}]
+ -- tmp[{{},3}] = w[{1,{},1,2}]
+ -- tmp[{{},4}] = h[{1,{},1,2}]
+ -- local box_utils = require 'densecap.box_utils'
+ -- local boxes_x = box_utils.xcycwh_to_x1y1x2y2(tmp:contiguous())
+ -- print(boxes_x)
+  --os.exit()
+  --print(self.output[{1,{},1,1}])
+  --os.exit()
   return self.output
 end
 

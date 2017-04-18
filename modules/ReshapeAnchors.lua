@@ -1,4 +1,4 @@
-local layer, parent = torch.class('nn.ReshapeBoxFeatures', 'nn.Module')
+local layer, parent = torch.class('nn.ReshapeAnchors', 'nn.Module')
 
 --[[
 Input a tensor of shape N x (D * k) x H x W
@@ -20,28 +20,26 @@ function layer:clearState()
   self.gradInput:set()
 end
 
---[[
+
 function layer:updateOutput(input)
   local N, H, W = input:size(1), input:size(3), input:size(4)
   local D = input:size(2) / self.k
   local k = self.k
   -- print(N, k, H, W, D)
-  self.input_perm:resize(N, k, H, W, D)
-  self.input_perm:copy(input:view(N, k, D, H, W):permute(1, 2, 4, 5, 3))
-  --self.input_perm:copy(input:view(N, k, D, H, W):permute(1,4,5,2,3))
-  self.output = self.input_perm:view(N, k * H * W, D)
+--  self.input_perm:resize(N, k, H, W, D)
+--  self.input_perm:copy(input:view(N, k, D, H, W):permute(1, 2, 4, 5, 3))
+--  self.input_perm:copy(input:view(N, k, D, H, W):permute(1,5,2,4,3))
+  --self.input_perm:copy(input:permute(1,4,3,2))
+--  self.output = self.input_perm:view(N, k * H * W, D)
+
+  self.output = input:permute(1,3,4,2):contiguous()
+  self.output = self.output:view(N,H,W,D,k)
+  self.output = self.output:permute(1,2,3,5,4):contiguous()
+  self.output = self.output:view(N,H*W*k,D)
+
   return self.output
 end
---]]
-function layer:updateOutput(input)
-  local N, H, W = input:size(1), input:size(3), input:size(4)
-  local D = input:size(2) / self.k
-  local k = self.k
---  input = input:view(N,D,k,H,W)
-  input = input:permute(1,3,4,2):contiguous()
-  self.output = input:view(N,k*H*W,D)
-  return self.output
-end
+
 
 function layer:updateGradInput(input, gradOutput)
   local N, H, W = input:size(1), input:size(3), input:size(4)
