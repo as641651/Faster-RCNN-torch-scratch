@@ -32,6 +32,15 @@ function layer:updateOutput(input)
   self.output = self.input_perm:view(N, k * H * W, D)
   return self.output
 end
+function layer:updateGradInput(input, gradOutput)
+  local N, H, W = input:size(1), input:size(3), input:size(4)
+  local D = input:size(2) / self.k
+  local k = self.k
+  self.gradInput_perm:resize(N, k, D, H, W)
+  self.gradInput_perm:copy(gradOutput:view(N, k, H, W, D):permute(1, 2, 5, 3, 4))
+  self.gradInput = self.gradInput_perm:view(N, k * D, H, W)
+  return self.gradInput
+end
 --]]
 function layer:updateOutput(input)
   local N, H, W = input:size(1), input:size(3), input:size(4)
@@ -47,8 +56,9 @@ function layer:updateGradInput(input, gradOutput)
   local N, H, W = input:size(1), input:size(3), input:size(4)
   local D = input:size(2) / self.k
   local k = self.k
-  self.gradInput_perm:resize(N, k, D, H, W)
-  self.gradInput_perm:copy(gradOutput:view(N, k, H, W, D):permute(1, 2, 5, 3, 4))
-  self.gradInput = self.gradInput_perm:view(N, k * D, H, W)
+  self.gradInput = self.gradInput:resize(N,k*H*W,D)
+  self.gradInput = self.gradInput:copy(gradOutput)
+  self.gradInput = self.gradInput:view(N, H, W,k*D)
+  self.gradInput = self.gradInput:permute(1,4,2,3):contiguous()
   return self.gradInput
 end

@@ -12,7 +12,6 @@ function layer:__init(k)
   self.gradInput_perm = torch.Tensor()
 end
 
-
 function layer:clearState()
   self.input_perm:set()
   self.gradInput_perm:set()
@@ -38,7 +37,7 @@ function layer:updateOutput(input)
   return self.output
 end
 
-
+--[[
 function layer:updateGradInput(input, gradOutput)
   local N, H, W = input:size(1), input:size(3), input:size(4)
   local D = input:size(2) / self.k
@@ -46,5 +45,18 @@ function layer:updateGradInput(input, gradOutput)
   self.gradInput_perm:resize(N, k, D, H, W)
   self.gradInput_perm:copy(gradOutput:view(N, k, H, W, D):permute(1, 2, 5, 3, 4))
   self.gradInput = self.gradInput_perm:view(N, k * D, H, W)
+  return self.gradInput
+end
+--]]
+
+function layer:updateGradInput(input, gradOutput)
+  local N, H, W = input:size(1), input:size(3), input:size(4)
+  local D = input:size(2) / self.k
+  local k = self.k
+  self.gradInput = self.gradInput:resize(N,k*H*W,D)
+  self.gradInput = self.gradInput:copy(gradOutput)
+  self.gradInput = self.gradInput:view(N,H,W,k,D)
+  self.gradInput = self.gradInput:permute(1,5,4,2,3):contiguous()
+  self.gradInput = self.gradInput:view(N,D*k,H,W)
   return self.gradInput
 end

@@ -48,6 +48,9 @@ function eval_utils.eval_split(kwargs)
     -- Grab a batch of data and convert it to the right dtype
     local data = {}
     local loader_kwargs = {split=split, iterate=true}
+    --loader:getBatch(loader_kwargs)
+    --loader:getBatch(loader_kwargs)
+    --loader:getBatch(loader_kwargs)
     local img, gt_boxes, gt_labels, info, _ = loader:getBatch(loader_kwargs)
     local data = {
       image = img:type(dtype),

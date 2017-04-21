@@ -532,6 +532,16 @@ function box_utils.filter_boxes(boxes,thresh)
   return valid
 end
 
+function box_utils.filter_boxes_s(boxes,thresh)
+  local ws = boxes[{{},3}] - boxes[{{},1}]
+  local hs = boxes[{{},4}] - boxes[{{},2}]
+  ws = ws:add(1)
+  hs = hs:add(1)
+  local validx = ws:ge(thresh)
+  local validy = hs:ge(thresh)
+  local valid = torch.gt(torch.cmul(validx, validy), 0) -- logical and operator
+  return valid
+end
 --[[
 Inputs:
 - boxes: N x 4 in xcycwh format

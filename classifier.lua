@@ -447,7 +447,6 @@ deploy.opt = opt
 function deploy.forward_test(input,scale_factor)  
 
    local scale = scale_factor or 1
-
    model.rpn:clearState()
    model.cnn_1:clearState()
    model.cnn_2:clearState()
@@ -460,8 +459,7 @@ function deploy.forward_test(input,scale_factor)
    local cnn_output_1 = model.cnn_1:forward(input)
    local cnn_output = model.cnn_2:forward(cnn_output_1)
    print(cnn_output:size())
-   --os.exit()
-   --[[
+  --[[ 
    for i=1,cnn_output:size(2) do
      for j=1,cnn_output:size(3) do
        for k=1,cnn_output:size(4) do
@@ -485,6 +483,13 @@ function deploy.forward_test(input,scale_factor)
   --print(opt.nms_thresh)
   --print(opt.max_proposals)
   -- os.exit()
+  --for i = 1,rpn_trans[1]:size(1) do
+  --  print(string.format("%.16f\n%.16f\n%.16f\n%.16f",rpn_trans[1][i][1],rpn_trans[1][i][2],rpn_trans[1][i][3],rpn_trans[1][i][4]))
+  --end
+  --for i=1,rpn_scores:size(2) do
+  --  print(string.format("%.16f",rpn_scores[1][i][2]))
+  --end
+  --os.exit()
    
 --   if opt.clip_boxes then
     local bounds = {
@@ -511,7 +516,7 @@ function deploy.forward_test(input,scale_factor)
     rpn_trans = clamp_data(rpn_trans,valid)
     rpn_scores = clamp_data(rpn_scores,valid)
     
-    valid = box_utils.filter_boxes(rpn_boxes[1],16*scale)
+    valid = box_utils.filter_boxes_s(box_utils.xcycwh_to_x1y1x2y2(rpn_boxes[1]),16*scale)
     rpn_boxes = clamp_data(rpn_boxes,valid)
     rpn_anchors = clamp_data(rpn_anchors,valid)
     rpn_trans = clamp_data(rpn_trans,valid)
@@ -530,10 +535,15 @@ function deploy.forward_test(input,scale_factor)
   local pos_exp = rpn_scores_exp[{1, {}, 2}]
   local neg_exp = rpn_scores_exp[{1, {}, 1}]
   local scores = (pos_exp + neg_exp):pow(-1):cmul(pos_exp)
-  --print(rpn_trans)
+  --print(rpn_trans:size())
+  --os.exit()
   --print(rpn_boxes_x1y1x2y2)
   --print(scores)
+  --for i=1,scores:size(1) do
+  --  print(string.format("%.16f",scores[i]))
+  --end
   --os.exit()
+  
   --print(scores)
   --os.exit()
  --[[ local ts = rpn_scores[{1,{},2}]:contiguous():view(486,38)
@@ -595,11 +605,54 @@ function deploy.forward_test(input,scale_factor)
   end
 
   --print(rpn_scores_nms)
+  --for i = 1,rpn_scores_nms:size(1) do
+  --  print(rpn_scores_nms[i])
+  --end
+  --local rpn_t = box_utils.xcycwh_to_x1y1x2y2(rpn_boxes_nms)
+  --for i = 1,rpn_t:size(1) do
+  --  print(string.format("%.16f\n%.16f\n%.16f\n%.16f",rpn_t[i][1],rpn_t[i][2],rpn_t[i][3],rpn_t[i][4]))
+  --end
   --print(box_utils.xcycwh_to_x1y1x2y2(rpn_boxes_nms))
   --os.exit()
   if cmd.bilinear == 1 then model.pooling:setImageSize(input:size(3), input:size(4)) end
   local roi_features = model.pooling:forward{cnn_output[1], rpn_boxes_nms}
+  --print(roi_features:size())
+  --roi_features = roi_features:view(-1)
+  --local file = io.open("04_logs/tin.log")
+  --local ij = 1 
+  --for line in file:lines() do
+  --  --print(tonumber(line))
+  --  roi_features[ij] = tonumber(line)
+  --  ij = ij+1
+  --end
+  --roi_features = roi_features:view(300,512,7,7)
+  --print(roi_features:size())
+  --os.exit()
+ --[[ for i=1,roi_features:size(1) do
+     for j=1,roi_features:size(2) do
+       for k=1,roi_features:size(3) do
+         for l=1,roi_features:size(4) do
+           print(string.format("%.16f",roi_features[i][j][k][l]))
+         end
+       end
+     end
+     if i > 10 then break end
+   end
+   os.exit()--]]
   local net_out = model.recog:forward(roi_features)
+  --print(net_out[1]:size())
+--  for i=1,net_out[1]:size(1) do
+--    for j=1,net_out[1]:size(2) do
+--      print(string.format("%.16f",net_out[1][i][j]))
+--    end
+--  end
+  --print(net_out[2]:size())
+  --for i=1,net_out[2]:size(1) do
+  --  for j=1,net_out[2]:size(2) do
+  --      print(string.format("%.16f",net_out[2][i][j]))
+  --  end
+  --end
+--  os.exit()
  
   net_out[2] = net_out[2]:view(net_out[2]:size(1),opt.num_classes,4)
   --print(net_out[2])
@@ -658,6 +711,7 @@ function deploy.forward_test(input,scale_factor)
   end
 
   print(final_boxes_output)
+  --os.exit()
   collectgarbage()
   return final_boxes_output, class_scores_output
 end
